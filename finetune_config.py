@@ -1,5 +1,5 @@
 _base_ = ["mmdet::grounding_dino/grounding_dino_swin-t_pretrain_obj365_goldg_cap4m.py"]
-data_root = "/content/drive/MyDrive/10440_TS_99_9_17042"
+data_root = "/content"
 
 # swinT, coco, object detection and text grounding
 lang_model_name = "bert-base-uncased"
@@ -157,7 +157,7 @@ train_dataloader = dict(
     dataset=dict(
         type="CustomCocoDataset",
         data_root=data_root,
-        ann_file="/content/train_coco_remapped.json",
+        ann_file="/content/train_coco.json",
         data_prefix=dict(img="."),
         pipeline=train_pipeline,
         return_classes=True,
@@ -169,7 +169,7 @@ val_dataloader = dict(
     dataset=dict(
         type="CustomCocoDataset",
         data_root=data_root,
-        ann_file="/content/val_coco_remapped.json",
+        ann_file="/content/val_coco.json",
         data_prefix=dict(img="."),
         pipeline=test_pipeline,
         return_classes=True,
@@ -181,7 +181,7 @@ test_dataloader = dict(
     dataset=dict(
         type="CustomCocoDataset",
         data_root=data_root,
-        ann_file="/content/val_coco_remapped.json",
+        ann_file="/content/val_coco.json",
         data_prefix=dict(img="."),
         pipeline=test_pipeline,
         return_classes=True,
@@ -192,30 +192,44 @@ test_dataloader = dict(
 
 val_evaluator = dict(
     type="CocoMetric",
-    ann_file="/content/val_coco_remapped.json",
+    ann_file="/content/val_coco.json",
     metric="bbox",
     format_only=False,
 )
 
 test_evaluator = dict(
     type="CocoMetric",
-    ann_file="/content/val_coco_remapped.json",
+    ann_file="/content/val_coco.json",
     metric="bbox",
     format_only=False,
 )
 
+# Override training schedule
+param_scheduler = [dict(type="ConstantLR", factor=1.0, by_epoch=True)]
+
 optim_wrapper = dict(
-    _delete_=True,
+    _delete_=True,  # Ensures we completely override any optimizer settings from base config
     type="OptimWrapper",
     optimizer=dict(
-        type="AdamW", lr=0.0001, weight_decay=0.01, betas=(0.9, 0.999), eps=1e-8
+        type="AdamW",  # Adaptive optimizer that handles weight decay properly
+        lr=0.0001,  # Learning rate - how big of steps to take when updating weights
+        weight_decay=0.01,  # Reduces weights by 1% after each update to prevent overfitting
+        betas=(
+            0.9,
+            0.999,
+        ),  # How much to use previous gradients (90%) and squared gradients (99.9%)
+        # Higher values = more smooth, stable training
+        eps=1e-8,  # Small number added to prevent division by zero
     ),
-    clip_grad=dict(max_norm=0.1, norm_type=2),
+    # Gradient clipping prevents gradients from getting too large
+    clip_grad=dict(
+        max_norm=0.1,  # If gradient magnitude > 0.1, scales it down
+        norm_type=2,  # Uses L2 norm (Euclidean distance) to measure gradient size
+    ),
 )
 
 # Pretrained checkpoint
-# load_from = "/content/checkpoints/grounding_dino_swin-t_finetune_16xb2_1x_coco_20230921_152544-5f234b20.pth"
 load_from = "/content/checkpoints/groundingdino_swint_ogc_mmdet-822d7e9d.pth"
 
 # Training settings
-train_cfg = dict(max_epochs=50, val_interval=1)
+train_cfg = dict(max_epochs=15, val_interval=1)
