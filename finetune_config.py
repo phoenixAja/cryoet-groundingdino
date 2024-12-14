@@ -1,200 +1,108 @@
-# Inherit base configuration from a pre-trained GroundingDINO model
 _base_ = ["mmdet::grounding_dino/grounding_dino_swin-t_pretrain_obj365_goldg_cap4m.py"]
-
-# Set the root directory for all data files
 data_root = "/content"
 
-# Specify the language model to use for text processing
+# swinT, coco, object detection and text grounding
 lang_model_name = "bert-base-uncased"
 
-# Main model configuration dictionary
 model = dict(
-    # Specify model type as GroundingDINO, which combines visual and text processing
     type="GroundingDINO",
-    # Number of object queries the model will predict
     num_queries=900,
-    # Enable iterative bounding box refinement
     with_box_refine=True,
-    # Use two-stage detection pipeline
     as_two_stage=True,
-    # Configuration for input data preprocessing
     data_preprocessor=dict(
-        # Type of preprocessor for detection tasks
         type="DetDataPreprocessor",
-        # Mean values for image normalization (RGB)
         mean=[123.675, 116.28, 103.53],
-        # Standard deviation values for image normalization
         std=[58.395, 57.12, 57.375],
-        # Convert BGR to RGB color format
         bgr_to_rgb=True,
-        # Disable mask padding
         pad_mask=False,
     ),
-    # Language model configuration
     language_model=dict(
-        # Use BERT model for text processing
         type="BertModel",
-        # Name of the pre-trained BERT model to use
         name=lang_model_name,
-        # Don't pad sequences to maximum length
         pad_to_max=False,
-        # Use sub-sentence representations
         use_sub_sentence_represent=True,
-        # Special tokens to handle in text processing
         special_tokens_list=["[CLS]", "[SEP]", ".", "?"],
-        # Add pooling layer for sentence embeddings
         add_pooling_layer=True,
     ),
-    # Visual backbone configuration (Swin Transformer)
     backbone=dict(
-        # Use Swin Transformer architecture
         type="SwinTransformer",
-        # Initial embedding dimensions
         embed_dims=96,
-        # Number of transformer blocks in each stage
         depths=[2, 2, 6, 2],
-        # Number of attention heads in each stage
         num_heads=[3, 6, 12, 24],
-        # Size of local attention window
         window_size=7,
-        # Multiplier for FFN layer dimension
         mlp_ratio=4,
-        # Enable bias in attention
         qkv_bias=True,
-        # Disable explicit scaling of attention
         qk_scale=None,
-        # Dropout rate for regular connections
         drop_rate=0.0,
-        # Dropout rate for attention
         attn_drop_rate=0.0,
-        # Stochastic depth rate
         drop_path_rate=0.2,
-        # Enable layer normalization in patches
         patch_norm=True,
-        # Which stages to output features from
         out_indices=(1, 2, 3),
-        # Disable gradient checkpointing
         with_cp=False,
-        # Disable weight conversion
         convert_weights=False,
     ),
-    # Neck configuration for feature processing
     neck=dict(
-        # Use ChannelMapper to process backbone features
         type="ChannelMapper",
-        # Input channel dimensions from backbone
         in_channels=[192, 384, 768],
-        # Kernel size for convolutions
         kernel_size=1,
-        # Output channel dimension
         out_channels=256,
-        # Disable activation function
         act_cfg=None,
-        # Enable bias in convolutions
         bias=True,
-        # Group normalization configuration
         norm_cfg=dict(type="GN", num_groups=32),
-        # Number of output feature levels
         num_outs=4,
     ),
-    # Encoder configuration
     encoder=dict(
-        # Number of encoder layers
         num_layers=6,
-        # Visual processing configuration
+        # visual layer config
         layer_cfg=dict(
-            # Self-attention configuration for visual features
             self_attn_cfg=dict(embed_dims=256, num_levels=4, dropout=0.0),
-            # Feed-forward network configuration
             ffn_cfg=dict(embed_dims=256, feedforward_channels=2048, ffn_drop=0.0),
         ),
-        # Text processing configuration
+        # text layer config
         text_layer_cfg=dict(
-            # Self-attention for text features
             self_attn_cfg=dict(num_heads=4, embed_dims=256, dropout=0.0),
-            # Feed-forward network for text
             ffn_cfg=dict(embed_dims=256, feedforward_channels=1024, ffn_drop=0.0),
         ),
-        # Vision-language fusion configuration
+        # fusion layer config
         fusion_layer_cfg=dict(
-            # Dimensions for visual features
-            v_dim=256,
-            # Dimensions for language features
-            l_dim=256,
-            # Embedding dimension for fusion
-            embed_dim=1024,
-            # Number of attention heads
-            num_heads=4,
-            # Initial values for layer scaling
-            init_values=1e-4,
+            v_dim=256, l_dim=256, embed_dim=1024, num_heads=4, init_values=1e-4
         ),
     ),
-    # Decoder configuration
     decoder=dict(
-        # Number of decoder layers
         num_layers=6,
-        # Return intermediate decoder outputs
         return_intermediate=True,
-        # Layer configuration
         layer_cfg=dict(
-            # Self-attention for queries
+            # query self attention layer
             self_attn_cfg=dict(embed_dims=256, num_heads=8, dropout=0.0),
-            # Cross-attention for text features
+            # cross attention layer query to text
             cross_attn_text_cfg=dict(embed_dims=256, num_heads=8, dropout=0.0),
-            # Cross-attention for image features
+            # cross attention layer query to image
             cross_attn_cfg=dict(embed_dims=256, num_heads=8, dropout=0.0),
-            # Feed-forward network configuration
             ffn_cfg=dict(embed_dims=256, feedforward_channels=2048, ffn_drop=0.0),
         ),
-        # Disable post-normalization
         post_norm_cfg=None,
     ),
-    # Positional encoding configuration
-    positional_encoding=dict(
-        # Number of positional encoding dimensions
-        num_feats=128,
-        # Normalize positional encodings
-        normalize=True,
-        # Offset for encodings
-        offset=0.0,
-        # Temperature for scaling
-        temperature=20,
-    ),
-    # Detection head configuration
+    positional_encoding=dict(num_feats=128, normalize=True, offset=0.0, temperature=20),
     bbox_head=dict(
-        # Use GroundingDINO head
         type="GroundingDINOHead",
-        # Number of object classes to detect
-        num_classes=6,
-        # Synchronize classification average factor across GPUs
+        num_classes=6,  # updated
         sync_cls_avg_factor=True,
-        # Contrastive learning configuration
         contrastive_cfg=dict(max_text_len=256),
-        # Classification loss configuration
-        # class_weight=[1.0, 3.0, 2.5, 2.5, 1.5, 3.0],  # Higher weight for underrepresented classes
         loss_cls=dict(
             type="FocalLoss", use_sigmoid=True, gamma=2.0, alpha=0.25, loss_weight=1.0
-        ),
-        # Bounding box regression loss
+        ),  # 2.0 in DeformDETR
         loss_bbox=dict(type="L1Loss", loss_weight=5.0),
     ),
-    # Denoising configuration
-    dn_cfg=dict(
-        # Scale for label noise
+    dn_cfg=dict(  # TODO: Move to model.train_cfg ?
         label_noise_scale=0.5,
-        # Scale for box coordinate noise
-        box_noise_scale=1.0,
-        # Group configuration for denoising
+        box_noise_scale=1.0,  # 0.4 for DN-DETR
         group_cfg=dict(dynamic=True, num_groups=None, num_dn_queries=100),
-    ),
-    # Training configuration
+    ),  # TODO: half num_dn_queries
+    # training and testing settings
     train_cfg=dict(
-        # Delete inherited training config
         _delete_=True,
-        # Hungarian matching assigner configuration
         assigner=dict(
             type="HungarianAssigner",
-            # Matching cost components
             match_costs=[
                 dict(type="ClassificationCost", weight=2.0),
                 dict(type="BBoxL1Cost", weight=5.0),
@@ -202,12 +110,126 @@ model = dict(
             ],
         ),
     ),
-    # Testing configuration
-    test_cfg=dict(
-        # Maximum detections per image
-        max_per_img=300
+    test_cfg=dict(max_per_img=300),
+)
+
+train_pipeline = [
+    dict(type="LoadImageFromFile", backend_args=None, imdecode_backend="pillow"),
+    dict(type="LoadAnnotations", with_bbox=True),
+    dict(type="FixScaleResize", scale=(800, 1333), keep_ratio=True, backend="pillow"),
+    dict(type="RandomFlip", prob=0.5),
+    dict(
+        type="PackDetInputs",
+        meta_keys=(
+            "img_id",
+            "img_path",
+            "ori_shape",
+            "img_shape",
+            "scale_factor",
+            "text",
+            "custom_entities",
+            "tokens_positive",
+        ),
+    ),
+]
+
+test_pipeline = [
+    dict(type="LoadImageFromFile", backend_args=None, imdecode_backend="pillow"),
+    dict(type="FixScaleResize", scale=(800, 1333), keep_ratio=True, backend="pillow"),
+    dict(type="LoadAnnotations", with_bbox=True),
+    dict(
+        type="PackDetInputs",
+        meta_keys=(
+            "img_id",
+            "img_path",
+            "ori_shape",
+            "img_shape",
+            "scale_factor",
+            "text",
+            "custom_entities",
+            "tokens_positive",
+        ),
+    ),
+]
+
+
+train_dataloader = dict(
+    dataset=dict(
+        type="CustomCocoDataset",
+        data_root=data_root,
+        ann_file="/content/train_coco.json",
+        data_prefix=dict(img="."),
+        pipeline=train_pipeline,
+        return_classes=True,
+        filter_cfg=dict(filter_empty_gt=True),
+    )
+)
+
+val_dataloader = dict(
+    dataset=dict(
+        type="CustomCocoDataset",
+        data_root=data_root,
+        ann_file="/content/val_coco.json",
+        data_prefix=dict(img="."),
+        pipeline=test_pipeline,
+        return_classes=True,
+        test_mode=True,
+    )
+)
+
+test_dataloader = dict(
+    dataset=dict(
+        type="CustomCocoDataset",
+        data_root=data_root,
+        ann_file="/content/val_coco.json",
+        data_prefix=dict(img="."),
+        pipeline=test_pipeline,
+        return_classes=True,
+        test_mode=True,
+        caption_prompt="Find ferritin complex, beta amylase, beta galactosidase, cytosolic ribosome, thyroglobulin, and virus",
+    )
+)
+
+val_evaluator = dict(
+    type="CocoMetric",
+    ann_file="/content/val_coco.json",
+    metric="bbox",
+    format_only=False,
+)
+
+test_evaluator = dict(
+    type="CocoMetric",
+    ann_file="/content/val_coco.json",
+    metric="bbox",
+    format_only=False,
+)
+
+# Override training schedule
+param_scheduler = [dict(type="ConstantLR", factor=1.0, by_epoch=True)]
+
+optim_wrapper = dict(
+    _delete_=True,  # Ensures we completely override any optimizer settings from base config
+    type="OptimWrapper",
+    optimizer=dict(
+        type="AdamW",  # Adaptive optimizer that handles weight decay properly
+        lr=0.0001,  # Learning rate - how big of steps to take when updating weights
+        weight_decay=0.01,  # Reduces weights by 1% after each update to prevent overfitting
+        betas=(
+            0.9,
+            0.999,
+        ),  # How much to use previous gradients (90%) and squared gradients (99.9%)
+        # Higher values = more smooth, stable training
+        eps=1e-8,  # Small number added to prevent division by zero
+    ),
+    # Gradient clipping prevents gradients from getting too large
+    clip_grad=dict(
+        max_norm=0.1,  # If gradient magnitude > 0.1, scales it down
+        norm_type=2,  # Uses L2 norm (Euclidean distance) to measure gradient size
     ),
 )
 
-# The rest of the configuration continues with data pipelines,
-# optimizers, and training settings following the same pattern...
+# Pretrained checkpoint
+load_from = "/content/checkpoints/groundingdino_swint_ogc_mmdet-822d7e9d.pth"
+
+# Training settings
+train_cfg = dict(max_epochs=15, val_interval=1)
